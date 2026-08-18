@@ -203,43 +203,37 @@ namespace MBBSDASM.Analysis
                     x.Disassembly.Mnemonic == ud_mnemonic_code.UD_Icmp &&
                     x.BranchFromRecords.Any(y => y.BranchType == EnumBranchType.Unconditional)))
                 {
+                    var previousLine = segment.DisassemblyLines
+                        .FirstOrDefault(x => x.Ordinal == disassemblyLine.Ordinal - 1);
+                    var nextLine = segment.DisassemblyLines
+                        .FirstOrDefault(x => x.Ordinal == disassemblyLine.Ordinal + 1);
 
+                    //cmp at the very beginning or end of a segment can't be part of a FOR pattern
+                    if (previousLine == null || nextLine == null)
+                        continue;
 
-                    if (MnemonicGroupings.IncrementDecrementGroup.Contains(segment.DisassemblyLines
-                            .First(x => x.Ordinal == disassemblyLine.Ordinal - 1).Disassembly.Mnemonic)
-                        && segment.DisassemblyLines
-                            .First(x => x.Ordinal == disassemblyLine.Ordinal + 1).BranchToRecords.Count > 0
-                        && segment.DisassemblyLines
-                            .First(x => x.Ordinal == disassemblyLine.Ordinal + 1).BranchToRecords.First(x => x.BranchType == EnumBranchType.Conditional)
-                            .Offset < disassemblyLine.Disassembly.Offset)
+                    var conditionalBranch = nextLine.BranchToRecords
+                        .FirstOrDefault(x => x.BranchType == EnumBranchType.Conditional);
+
+                    if (MnemonicGroupings.IncrementDecrementGroup.Contains(previousLine.Disassembly.Mnemonic)
+                        && conditionalBranch != null
+                        && conditionalBranch.Offset < disassemblyLine.Disassembly.Offset)
                     {
 
-                        if (MnemonicGroupings.IncrementGroup.Contains(segment.DisassemblyLines
-                            .First(x => x.Ordinal == disassemblyLine.Ordinal - 1).Disassembly
-                            .Mnemonic))
-                        {
-                            segment.DisassemblyLines
-                                .First(x => x.Ordinal == disassemblyLine.Ordinal - 1).Comments
-                                .Add("[FOR] Increment Value");
-                        }
-                        else
-                        {
-                            segment.DisassemblyLines
-                                .First(x => x.Ordinal == disassemblyLine.Ordinal - 1).Comments
-                                .Add("[FOR] Decrement Value");
-                        }
+                        previousLine.Comments.Add(
+                            MnemonicGroupings.IncrementGroup.Contains(previousLine.Disassembly.Mnemonic)
+                                ? "[FOR] Increment Value"
+                                : "[FOR] Decrement Value");
 
                         disassemblyLine.Comments.Add("[FOR] Evaluate Break Condition");
-                        
+
                         //Label beginning of FOR logic by labeling source of unconditional jump
                         segment.DisassemblyLines
                             .First(x => x.Disassembly.Offset == disassemblyLine.BranchFromRecords
                                             .First(y => y.BranchType == EnumBranchType.Unconditional).Offset).Comments
                             .Add("[FOR] Beginning of FOR logic");
-                        
-                        segment.DisassemblyLines
-                            .First(x => x.Ordinal == disassemblyLine.Ordinal + 1).Comments
-                            .Add("[FOR] Branch based on evaluation");
+
+                        nextLine.Comments.Add("[FOR] Branch based on evaluation");
                     }
                 }
 

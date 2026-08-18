@@ -103,7 +103,11 @@ namespace MBBSDASM.Dasm
         {
             foreach (var entry in file.EntryTable)
             {
-                var seg = file.SegmentTable.First(x => x.Ordinal == entry.SegmentNumber);
+                var seg = file.SegmentTable.FirstOrDefault(x => x.Ordinal == entry.SegmentNumber);
+
+                //Entries can reference segments that don't exist (e.g. constant segments)
+                if (seg == null)
+                    continue;
 
                 var fnName = file.NonResidentNameTable.FirstOrDefault(x => x.IndexIntoEntryTable == entry.Ordinal)
                     ?.Name;
@@ -130,7 +134,7 @@ namespace MBBSDASM.Dasm
         {
             Parallel.ForEach(file.SegmentTable, (segment) =>
             {
-                if (!segment.Flags.Contains(EnumSegmentFlags.Code) &&
+                if (!segment.Flags.Contains(EnumSegmentFlags.Code) ||
                     !segment.Flags.Contains(EnumSegmentFlags.HasRelocationInfo))
                     return;
                 Parallel.ForEach(segment.RelocationRecords, (relocationRecord) =>
