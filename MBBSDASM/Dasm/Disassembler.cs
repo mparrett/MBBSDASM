@@ -338,36 +338,40 @@ namespace MBBSDASM.Dasm
                 0xEB, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F,
                 0xE3
             };
-            var jumpNearOps1stByte = new[] {0xE9, 0x0F};
             var jumpNearOps2ndByte = new[]
-                {0x80, 0x81, 0x82, 0x83, 0x84, 0x5, 0x86, 0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F};
+                {0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F};
 
             foreach (var segment in file.SegmentTable.Where(x =>
                 x.Flags.Contains(EnumSegmentFlags.Code) && x.DisassemblyLines.Count > 0))
             {
-                //Only op+operand <= 3 bytes, skip jmp word ptr because we won't be able to label those
                 foreach (var disassemblyLine in segment.DisassemblyLines.Where(x =>
-                    MnemonicGroupings.JumpGroup.Contains(x.Disassembly.Mnemonic) && x.Disassembly.Bytes.Length <= 3))
+                    MnemonicGroupings.JumpGroup.Contains(x.Disassembly.Mnemonic)))
                 {
-                    ulong target = 0;
+                    var bytes = disassemblyLine.Disassembly.Bytes;
+                    ulong target;
 
                     //Jump Short, Relative to next Instruction (8 bit)
-                    if (jumpShortOps.Contains(disassemblyLine.Disassembly.Bytes[0]))
+                    if (bytes.Length == 2 && jumpShortOps.Contains(bytes[0]))
                     {
-                        target = ToRelativeOffset8(disassemblyLine.Disassembly.Bytes[1],
-                            disassemblyLine.Disassembly.Offset, disassemblyLine.Disassembly.Bytes.Length);
+                        target = ToRelativeOffset8(bytes[1],
+                            disassemblyLine.Disassembly.Offset, bytes.Length);
                     }
-
-                    //Jump Near, Relative to next Instruction (16 bit)
-                    //Check to see if it's a 1 byte unconditinoal or a 2 byte conditional
-                    if (jumpNearOps1stByte.Contains(disassemblyLine.Disassembly.Bytes[0]) &&
-                        (disassemblyLine.Disassembly.Bytes[0] == 0xE9 ||
-                         jumpNearOps2ndByte.Contains(disassemblyLine.Disassembly.Bytes[1])))
+                    //Jump Near Unconditional, Relative to next Instruction (16 bit)
+                    else if (bytes.Length == 3 && bytes[0] == 0xE9)
                     {
-                        target = ToRelativeOffset16(BitConverter.ToUInt16(disassemblyLine.Disassembly.Bytes,
-                                disassemblyLine.Disassembly.Bytes[0] == 0xE9 ? 1 : 2),
-                            disassemblyLine.Disassembly.Offset,
-                            disassemblyLine.Disassembly.Bytes.Length);
+                        target = ToRelativeOffset16(BitConverter.ToUInt16(bytes, 1),
+                            disassemblyLine.Disassembly.Offset, bytes.Length);
+                    }
+                    //Jump Near Conditional (2 byte opcode), Relative to next Instruction (16 bit)
+                    else if (bytes.Length == 4 && bytes[0] == 0x0F && jumpNearOps2ndByte.Contains(bytes[1]))
+                    {
+                        target = ToRelativeOffset16(BitConverter.ToUInt16(bytes, 2),
+                            disassemblyLine.Disassembly.Offset, bytes.Length);
+                    }
+                    else
+                    {
+                        //Register/memory-indirect jumps (jmp ax, jmp word ptr [..]) have no static target to label
+                        continue;
                     }
 
                     //Set Target
@@ -482,16 +486,16 @@ namespace MBBSDASM.Dasm
         /// <param name="instructionLength"></param>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong ToRelativeOffset16(ushort operand, ulong currentOffset, int instructionLength)
+        internal static ulong ToRelativeOffset16(ushort operand, ulong currentOffset, int instructionLength)
         {
-            if (operand < 0x7FFF)
+            if (operand <= 0x7FFF)
             {
                 //Near Forward Jump
                 return operand + currentOffset + (ulong) instructionLength;
             }
 
             //Near Backwards Jump
-            return currentOffset - (ushort) ~operand + (ulong) instructionLength;
+            return (ulong) ((long) currentOffset + instructionLength - ((ushort) ~operand + 1));
         }
 
         /// <summary>
@@ -502,7 +506,7 @@ namespace MBBSDASM.Dasm
         /// <param name="instructionLength"></param>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong ToRelativeOffset8(byte operand, ulong currentOffset, int instructionLength)
+        internal static ulong ToRelativeOffset8(byte operand, ulong currentOffset, int instructionLength)
         {
             if (operand <= 0x7F)
             {
