@@ -9,7 +9,10 @@ namespace MBBSDASM.Tests
     /// </summary>
     internal static class MinimalNEFile
     {
-        public static byte[] Build(byte[] code, byte[] entryTable = null)
+        public const ushort CodeWithRelocationInfo = 0x0100;
+
+        public static byte[] Build(byte[] code, byte[] entryTable = null,
+            ushort segmentFlags = CodeWithRelocationInfo)
         {
             const int neHeaderOffset = 0x80;
             const int segmentTableOffset = 0x40;  //relative to NE header
@@ -40,18 +43,19 @@ namespace MBBSDASM.Tests
             WriteUInt32(file, neHeaderOffset + 0x2C, (uint) file.Length);   //non-resident names (empty)
             //LogicalSectorAlignmentShift (0x32), table lengths, and counts stay 0
 
-            //Segment table: one fixed code segment with relocation info present but empty
+            //Segment table: one fixed segment
             WriteUInt16(file, neHeaderOffset + segmentTableOffset, segmentDataOffset);
             WriteUInt16(file, neHeaderOffset + segmentTableOffset + 2, (ushort) code.Length);
-            WriteUInt16(file, neHeaderOffset + segmentTableOffset + 4, 0x0100); //code + HasRelocationInfo
+            WriteUInt16(file, neHeaderOffset + segmentTableOffset + 4, segmentFlags);
             WriteUInt16(file, neHeaderOffset + segmentTableOffset + 6, (ushort) code.Length);
 
             //Entry table; the resident name table terminator after it is already zeroed
             Array.Copy(entryTable, 0, file, neHeaderOffset + entryTableOffset, entryTable.Length);
 
-            //Segment data followed by a zero-entry relocation table
+            //Segment data, followed by a zero-entry relocation table when the flag is set
             Array.Copy(code, 0, file, segmentDataOffset, code.Length);
-            WriteUInt16(file, segmentDataOffset + code.Length, 0);
+            if ((segmentFlags & 0x0100) != 0)
+                WriteUInt16(file, segmentDataOffset + code.Length, 0);
 
             return file;
         }
