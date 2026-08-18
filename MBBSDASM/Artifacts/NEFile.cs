@@ -159,13 +159,18 @@ namespace MBBSDASM.Artifacts
                 while (WindowsHeader.EntryTableOffset + entryByteOffset  < WindowsHeader.NonResidentNameTableOffset)
                 {
                     //0xFF is moveable (6 bytes), anything else is fixed as it becomes the segment number
-                    var entryCount = data[WindowsHeader.EntryTableOffset + entryByteOffset]; 
+                    var entryCount = data[WindowsHeader.EntryTableOffset + entryByteOffset];
                     var entrySegment = data[WindowsHeader.EntryTableOffset + entryByteOffset + 1];
 
-                    if (entryCount == 1  && entrySegment == 0)
+                    //A bundle count of 0 marks the end of the Entry Table
+                    if (entryCount == 0)
+                        break;
+
+                    //Null bundles are 2 bytes and reserve entryCount unused ordinals
+                    if (entrySegment == 0)
                     {
                         entryByteOffset += 2;
-                        entryOrdinal += 1;
+                        entryOrdinal += entryCount;
                         continue;
                     }
 
@@ -189,6 +194,7 @@ namespace MBBSDASM.Artifacts
                             entry.Offset =
                                 BitConverter.ToUInt16(FileContent,
                                     WindowsHeader.EntryTableOffset + entryByteOffset + 6 + entrySize * i);
+                            entry.Ordinal = entryOrdinal;
                         }
                         entryOrdinal++;
                         EntryTable.Add(entry);
