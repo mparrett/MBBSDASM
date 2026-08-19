@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using MBBSDASM.Dasm;
 using MBBSDASM.Renderer.impl;
+using NLog;
 using Terminal.Gui;
 
 namespace MBBSDASM.UI.impl
@@ -24,10 +25,24 @@ namespace MBBSDASM.UI.impl
         private readonly Label _statusLabel;
         internal InteractiveUI()
         {
+            //Console log output would draw over the TUI, so suspend logging for the interactive session
+            LogManager.DisableLogging();
+
+            //The curses driver reports a 0x0 terminal on macOS, blanking the UI and crashing
+            //any view that sizes itself from Driver.Cols - the portable .NET driver works everywhere
+            Application.UseSystemConsole = true;
             Application.Init();
 
             //Define Main Window
-            _mainWindow = new Window(new Rect(0, 1, Application.Top.Frame.Width, Application.Top.Frame.Height - 1), null);
+            //Computed layout instead of absolute Rects: Application.Top.Frame isn't sized until
+            //Application.Run() lays it out, so reading it here crashed on startup (Height was 0)
+            _mainWindow = new Window(null)
+            {
+                X = 0,
+                Y = 1,
+                Width = Dim.Fill(),
+                Height = Dim.Fill()
+            };
             _mainWindow.Add(new Label(0, 0, $"--=[About {Constants.ProgramName}]=--"));
             _mainWindow.Add(new Label(0, 1, $"{Constants.ProgramName} is a x86 16-Bit NE Disassembler with advanced analysis for MajorBBS/Worldgroup modules"));
             _mainWindow.Add(new Label(0, 3, $"--=[Credits]=--"));
@@ -36,10 +51,20 @@ namespace MBBSDASM.UI.impl
             _mainWindow.Add(new Label(0, 6, "Terminal.Gui is Copyright (c) 2017 Microsoft Corp and is distributed under the MIT License"));
             _mainWindow.Add(new Label(0, 8, $"--=[Code]=--"));
             _mainWindow.Add(new Label(0, 9, "http://www.github.com/enusbaum/mbbsdasm"));
-            _progressBar =
-                new ProgressBar(new Rect(1, Application.Top.Frame.Height - 5, Application.Top.Frame.Width - 4, 1));
+            _progressBar = new ProgressBar
+            {
+                X = 1,
+                Y = Pos.AnchorEnd(4),
+                Width = Dim.Fill(3),
+                Height = 1
+            };
             _mainWindow.Add(_progressBar);
-            _statusLabel = new Label(1, Application.Top.Frame.Height - 7, "Ready!");
+            _statusLabel = new Label("Ready!")
+            {
+                X = 1,
+                Y = Pos.AnchorEnd(6),
+                Width = Dim.Fill(3)
+            };
             _mainWindow.Add(_statusLabel);
             Application.Top.Add(_mainWindow);
 
