@@ -152,54 +152,59 @@ namespace MBBSDASM.UI.impl
                 if (File.Exists(_outputFile))
                     File.Delete(_outputFile);
 
-                _statusLabel.Text = "Performing Disassembly...";
+                SetProgress("Performing Disassembly...", 0f);
                 var inputFile = dasm.Disassemble(_optionMinimal);
 
                 //Apply Selected Analysis
                 if (_optionMBBSAnalysis)
                 {
-                    _statusLabel.Text = "Performing Additional Analysis...";
+                    SetProgress("Performing Additional Analysis...", 0f);
                     Analysis.MBBS.Analyze(inputFile);
                 }
-                _progressBar.Fraction = .25f;
-
+                SetProgress("Processing Segment Information...", .25f);
 
                 var _stringRenderer = new StringRenderer(inputFile);
 
-                _statusLabel.Text = "Processing Segment Information...";
                 File.AppendAllText(_outputFile, _stringRenderer.RenderSegmentInformation());
-                _progressBar.Fraction = .50f;
+                SetProgress("Processing Entry Table...", .50f);
 
-
-                _statusLabel.Text = "Processing Entry Table...";
                 File.AppendAllText(_outputFile, _stringRenderer.RenderEntryTable());
-                _progressBar.Fraction = .75f;
+                SetProgress("Processing Disassembly...", .75f);
 
- 
-
-                _statusLabel.Text = "Processing Disassembly...";
                 File.AppendAllText(_outputFile, _stringRenderer.RenderDisassembly(_optionMBBSAnalysis));
-                _progressBar.Fraction = .85f;
-
+                SetProgress("Processing Strings...", .85f);
 
                 if (_optionStrings)
-                {
-                    _statusLabel.Text = "Processing Strings...";
                     File.AppendAllText(_outputFile, _stringRenderer.RenderStrings());
-                }
 
-                _statusLabel.Text = "Done!";
-                _progressBar.Fraction = 1f;
+                SetProgress("Done!", 1f);
             }
 
-            var d = new Dialog($"Disassembly Complete!", 50, 12);
-            d.Add(new Label(0, 0, $"Output File: {_outputFile}"),
-                new Label(0, 1, $"Bytes Written: {new FileInfo(_outputFile).Length}")
-            );
-            var okBtn = new Button("OK", true);
-            okBtn.Clicked += () => { Application.RequestStop (); };
-            d.AddButton(okBtn);
-            Application.Run(d);
+            //The completion dialog needs its event loop on the UI thread - running it from this
+            //background thread leaves it unable to receive input, so it can never be dismissed
+            Application.MainLoop.Invoke(() =>
+            {
+                var d = new Dialog($"Disassembly Complete!", 50, 12);
+                d.Add(new Label(0, 0, $"Output File: {_outputFile}"),
+                    new Label(0, 1, $"Bytes Written: {new FileInfo(_outputFile).Length}")
+                );
+                var okBtn = new Button("OK", true);
+                okBtn.Clicked += () => { Application.RequestStop (); };
+                d.AddButton(okBtn);
+                Application.Run(d);
+            });
+        }
+
+        /// <summary>
+        ///     Updates the status label and progress bar on the UI thread
+        /// </summary>
+        private void SetProgress(string status, float fraction)
+        {
+            Application.MainLoop.Invoke(() =>
+            {
+                _statusLabel.Text = status;
+                _progressBar.Fraction = fraction;
+            });
         }
     }
 }
