@@ -88,6 +88,12 @@ namespace MBBSDASM.UI.impl
         {
             //Run it
             Application.Run();
+            Application.Shutdown();
+
+            //The .NET console driver doesn't restore the terminal on shutdown, leaving mouse
+            //tracking enabled (every mouse move types escape sequences into the shell) and the
+            //alternate screen active - reset those modes by hand
+            System.Console.Write("\x1b[?1003l\x1b[?1015l\x1b[?1006l\x1b[?1049l\x1b[?25h\x1b[0m");
         }
 
         private void OpenFile()
