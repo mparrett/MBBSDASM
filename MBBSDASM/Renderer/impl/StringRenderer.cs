@@ -204,7 +204,7 @@ namespace MBBSDASM.Renderer.impl
                 output.AppendLine(";-------------------------------------------");
                 foreach (var str in seg.StringRecords)
                     output.AppendLine(
-                        $"{str.Offset + str.Offset:X8}h:{seg.Ordinal:0000}.{str.Offset:X4}h '{str.Value}'");
+                        $"{str.Offset + seg.Offset:X8}h:{seg.Ordinal:0000}.{str.Offset:X4}h '{str.Value}'");
             }
 
             return output.ToString();

@@ -140,7 +140,7 @@ namespace MBBSDASM.UI.impl
                 var renderer = new StringRenderer(inputFile);
                 var output = new StringBuilder();
                 output.AppendLine($"; Disassembly of {inputFile.Path}{inputFile.FileName}");
-                output.AppendLine($"; Description: {inputFile.NonResidentNameTable[0].Name}");
+                output.AppendLine($"; Description: {inputFile.NonResidentNameTable.FirstOrDefault()?.Name}");
                 output.AppendLine(";");
 
                 //Render Segment Information to output
