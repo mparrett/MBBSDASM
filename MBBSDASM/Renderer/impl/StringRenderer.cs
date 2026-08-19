@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using MBBSDASM.Artifacts;
+using MBBSDASM.Dasm;
 using MBBSDASM.Enums;
 
 namespace MBBSDASM.Renderer.impl
@@ -110,6 +111,11 @@ namespace MBBSDASM.Renderer.impl
                     //Rendering labels are built locally so rendering doesn't mutate the model
                     var comments = new List<string>(d.Comments ?? Enumerable.Empty<string>());
 
+                    //ConcurrentBag enumeration order varies run to run (records are added from
+                    //parallel relocation analysis), so sort before rendering for deterministic output
+                    var branchFromRecords = SortBranchRecords(d.BranchFromRecords);
+                    var branchToRecords = SortBranchRecords(d.BranchToRecords);
+
                     //Label Entrypoints/Exported Functions
                     if (d.ExportedFunction != null)
                     {
@@ -117,7 +123,7 @@ namespace MBBSDASM.Renderer.impl
                     }
 
                     //Label Branch Targets
-                    foreach (var b in d.BranchFromRecords)
+                    foreach (var b in branchFromRecords)
                     {
                         switch (b.BranchType)
                         {
@@ -134,12 +140,12 @@ namespace MBBSDASM.Renderer.impl
                     }
 
                     //Label Branch Origins (Relocation)
-                    foreach (var b in d.BranchToRecords.Where(x =>
+                    foreach (var b in branchToRecords.Where(x =>
                         x.IsRelocation && x.BranchType == EnumBranchType.Call))
                         comments.Add($"CALL {b.Segment:0000}.{b.Offset:X4}h (Relocation)");
 
                     //Label Refereces by SEG ADDR (Internal)
-                    foreach (var b in d.BranchToRecords.Where(x =>
+                    foreach (var b in branchToRecords.Where(x =>
                         x.IsRelocation && x.BranchType == EnumBranchType.SegAddr))
                         comments.Add($"SEG ADDR of Segment {b.Segment}");
 
@@ -151,7 +157,7 @@ namespace MBBSDASM.Renderer.impl
                     //Only label Imports if Analysis is off, because Analysis does much more in-depth labeling
                     if (!analysis)
                     {
-                        foreach (var b in d.BranchToRecords?.Where(x =>
+                        foreach (var b in branchToRecords.Where(x =>
                             x.IsRelocation && (x.BranchType == EnumBranchType.CallImport ||
                                                x.BranchType == EnumBranchType.SegAddrImport)))
                             comments.Add(
@@ -213,5 +219,16 @@ namespace MBBSDASM.Renderer.impl
 
             return output.ToString();
         }
+
+        /// <summary>
+        ///     Orders branch records for rendering, since ConcurrentBag enumeration order is not stable
+        /// </summary>
+        private static List<BranchRecord> SortBranchRecords(IEnumerable<BranchRecord> records) =>
+            (records ?? Enumerable.Empty<BranchRecord>())
+            .OrderBy(x => x.Segment)
+            .ThenBy(x => x.Offset)
+            .ThenBy(x => x.BranchType)
+            .ThenBy(x => x.IsRelocation)
+            .ToList();
     }
 }
