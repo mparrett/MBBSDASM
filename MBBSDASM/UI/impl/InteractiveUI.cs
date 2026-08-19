@@ -31,6 +31,10 @@ namespace MBBSDASM.UI.impl
             //The curses driver reports a 0x0 terminal on macOS, blanking the UI and crashing
             //any view that sizes itself from Driver.Cols - the portable .NET driver works everywhere
             Application.UseSystemConsole = true;
+
+            //The .NET driver paints straight onto the main screen, so switch to the alternate
+            //screen first - exiting then restores whatever the terminal showed before launch
+            System.Console.Write("\x1b[?1049h");
             Application.Init();
 
             //Define Main Window
@@ -93,7 +97,7 @@ namespace MBBSDASM.UI.impl
             //The .NET console driver doesn't restore the terminal on shutdown, leaving mouse
             //tracking enabled (every mouse move types escape sequences into the shell) and the
             //alternate screen active - reset those modes by hand
-            System.Console.Write("\x1b[?1003l\x1b[?1015l\x1b[?1006l\x1b[?1049l\x1b[?25h\x1b[0m");
+            System.Console.Write("\x1b[?1003l\x1b[?1015l\x1b[?1006l\x1b[?1049l\x1b[?1l\x1b[?25h\x1b[0m");
         }
 
         private void OpenFile()
